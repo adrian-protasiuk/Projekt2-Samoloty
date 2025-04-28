@@ -1,0 +1,112 @@
+Projekt: Symulator Wieży Kontroli Lotów
+1. Ogólne zasady
+- Gra to symulacja kontroli ruchu lotniczego, odbywającego się na planszy 12×10 pól (X = 0–11, Y = 0–9).
+- Wyświetlana wersja planszy ma 60×10 znaków, gdzie każdy X odpowiada 5 znakom.
+- Samoloty poruszają się poziomo oraz, jeśli to wymagane, pionowo zgodnie z wydanymi komendami.
+- Samolot na ekranie zajmuje 5 znaków w formacie np. (A3)/.
+
+
+2. Początek symulacji
+- Na starcie pojawiają się 3 samoloty:- 2 po jednej stronie (lewej lub prawej), 1 po drugiej.
+
+- Samoloty startują jedno pole poza ramką:- X = -1, jeśli lecą w prawo.
+- X = 12, jeśli lecą w lewo.
+
+- Każdy startowy samolot ma:- Unikalne oznaczenie literą (A, B, C itd.).
+- Status czyLeci = true.
+- Losową wysokość Y (0–9), z min. 3 jednostkami odstępu od innych.
+- Domyślną komendę stabilnego lotu ("0=").
+- Określony kierunek lotu (true – w prawo, false – w lewo).
+
+
+
+3. Przebieg każdej tury
+Każda tura składa się z następujących etapów:
+- Szansa 5% na pojawienie się nowego samolotu (generujNowySamolot):- Kierunek lotu losowy (prawo lub lewo).
+- Losowa bezpieczna wysokość (z min. 3 jednostkami odstępu od innych).
+- Nowa unikalna litera (np. po A, B, C → D, E...).
+- Maksymalnie 4 samoloty mogą być aktywne jednocześnie (maks. 2 w każdym kierunku).
+
+- Wydawanie komend (wydajKomende):- Można wydać dokładnie jedną komendę na turę.
+- Format komend:- " " (spacja) – pominięcie tury, brak zmiany polecenia.
+- <litera> / <1-9> – nakaz wzniesienia się o podaną liczbę pól.
+- <litera> \\ <1-9> – nakaz obniżenia lotu o podaną liczbę pól.
+- <litera> c – anulowanie istniejącego rozkazu.
+
+- Komenda zaczyna działać od kolejnej tury.
+
+- Ruch samolotów (przesun):- Każdy samolot przesuwa się poziomo o 1 pole w kierunku lotu.
+- Jeśli aktywna jest komenda (/ lub \), samolot przesuwa się pionowo.
+- Po zakończeniu komendy samolot przechodzi w stabilny lot ("=").
+
+- Usuwanie samolotów (pozaPlansza):- Samoloty są usuwane, jeśli ich X wyjdzie poza granice planszy (X = -1 lub X = 12).
+
+- Sprawdzanie kolizji (sprawdzKolizje):- Kolizja występuje, gdy dwa samoloty znajdują się w odległości <3 pól zarówno poziomo, jak i pionowo.
+- Jeśli nastąpi kolizja, symulacja zostaje zakończona.
+
+- Wyświetlanie planszy (rysujPlansze):- Najpierw pojawia się informacja o wydanej komendzie.
+- Następnie program renderuje aktualną wersję planszy w formacie 60×10.
+
+- Pauza (pauza):- Po każdej turze następuje przerwa 1,5 sekundy przed kontynuacją.
+
+
+
+4. Zasady dotyczące samolotów
+Każdy samolot posiada:
+- int x, y – współrzędne na planszy 12×10.
+- char oznaczenie – unikalna litera (A, B, C... itp.).
+- bool czyLeci – status, czy samolot jeszcze lata.
+- bool kierunek – true (→ prawo), false (← lewo).
+- int liczbaPolKomendy – liczba pól pozostałych do wykonania komendy.
+- char znakKomendy – '/', '', '='.
+- bool aktywowanaKomenda - true (komenda już działa tej turze), false (komenda działa od następnej tury)
+
+Format wyświetlania samolotów na planszy:
+(A3)/     (B0)=     (C2)\
+
+
+(Każdy samolot zajmuje dokładnie 5 znaków na ekranie)
+
+5. Zakończenie programu
+- Program kończy się automatycznie, gdy wszystkie samoloty zostaną usunięte z planszy (brak aktywnych lotów).
+- Jeśli wystąpi nieunikniona kolizja, symulacja zostaje przerwana, a program zgłasza błąd.
+
+
+6. Inteligentne wydawanie komend
+- Program analizuje możliwe trajektorie i przewiduje potencjalne kolizje (PRZEWIDYWANIE_TUR = 6).
+- Komendy nie są losowe – są generowane na podstawie obliczeń.
+- Jeśli system nie jest w stanie zapobiec kolizji, symulacja zostaje zakończona.
+
+7. Inteligentne zarządzanie komendami
+- Przewidywanie przyszłych kolizji (PRZEWIDYWANIE_TUR = 6): system analizuje ruchy samolotów na kilka tur do przodu, aby dobrać optymalną komendę.
+- Komendy są aktywowane z opóźnieniem – ich wykonanie rozpoczyna się od kolejnej tury.
+- Sortowanie scenariuszy komend:- Priorytet dla bezpiecznych manewrów.
+- Priorytet dla samolotów w krytycznej odległości (<3 pól).
+- Preferencja komend, które wymagają minimalnej zmiany wysokości.
+
+
+
+8. Zasady generowania nowych samolotów
+- Każda tura ma (1/13) szansy na pojawienie się nowego samolotu (generujNowySamolot).
+- Maksymalna liczba samolotów w powietrzu: 4 (po 2 w każdą stronę).
+- Każdy nowy samolot:- Ma losowy kierunek (prawo lub lewo).
+- Ma bezpieczną wysokość, oddaloną min. 3 jednostki od innych.
+- Otrzymuje unikalną literę (A-Z).
+- W 5 turze, o ile nie pojawił się już, generowany jest zawsze 4 samolot
+
+- Ograniczenia w dodawaniu nowych samolotów:- Jeśli na planszy są już 3 samoloty, nowy może pojawić się dopiero gdy istniejące osiągną X > 4.
+- Jeśli samoloty w danym kierunku osiągnęły limit (2), nowy samolot nie zostanie dodany.
+
+
+
+9. Warunki zakończenia symulacji
+- Program kończy się, gdy na planszy nie ma żadnych aktywnych samolotów (czyLeci = false dla wszystkich).
+- Jeśli nastąpi nieunikniona kolizja, system przerywa symulację i zgłasza błąd.
+- Kolizje są sprawdzane bardzo wcześnie dla samolotów o wysokości różniącej się o maks. 2 jednostki.
+
+
+
+
+
+
+

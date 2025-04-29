@@ -120,7 +120,7 @@ bool kierunek – true (prawo), false (lewo).
 
 int liczbaPolKomendy – liczba pozostałych tur wykonania komendy.
 
-char znakKomendy – '=', '/', '\\'.
+char znakKomendy – '=', '/', '\'.
 
 bool aktywowanaKomenda – czy komenda już działa.
 

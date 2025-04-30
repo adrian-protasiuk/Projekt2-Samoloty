@@ -1,3 +1,7 @@
+// Projekt wykonali:
+// Adrian Protasiuk, s203374, acir 3B
+// Kajetan Rajczyk, s203627 , acir 3B
+
 #include <iostream>
 #include <vector>
 #include <cstdlib>
@@ -19,6 +23,13 @@ const int WYSOKOSC = 10;
 const int RAMKA_X = 12;
 const int RAMKA_Y = 10;
 const int PRZEWIDYWANIE_TUR = 12;
+const int BLOKADA_STRONY_TURY_POCZATEK = 7;
+const int BLOKADA_STRONY_TURY_1 = 10;
+const int BLOKADA_STRONY_TURY_2 = 13;
+const int TURA_ZWIEKSZENIA_BLOKADY_1 = 13;
+const int TURA_ZWIEKSZENIA_BLOKADY_2 = 21;
+const int TURA_PIERWSZEGO_SAMOLOTU = 6;
+const int MINIMALNY_ODSTEP_POCZATKOWE = 2;
 
 atomic<bool> zatrzymajMonitorowanie(false);
 atomic<bool> wykrytaKolizja(false);
@@ -33,6 +44,7 @@ public:
     int liczbaPolKomendy;
     char znakKomendy;
     bool aktywowanaKomenda;
+    bool czyPoczatkowy = false;
 
     Samolot(int startY, bool startKierunek, char litera)
         : y(startY), kierunek(startKierunek), oznaczenie(litera), czyLeci(true),
@@ -45,6 +57,12 @@ public:
 
         if (!aktywowanaKomenda) {
             aktywowanaKomenda = true;
+            return;
+        }
+
+        if (znakKomendy == 'c') {
+            znakKomendy = '=';
+            liczbaPolKomendy = 0;
             return;
         }
 
@@ -67,25 +85,52 @@ public:
     }
 };
 
-bool sprawdzKolizje(const vector<Samolot>& samoloty) {
+bool sprawdzKolizje(const vector<Samolot>& samoloty, bool czyWypisywac = false) {
+
+    bool czyKolizja = false;
+    int wspolrzednaKolizji1;
+    int wspolrzednaKolizji2;
+
     for (size_t i = 0; i < samoloty.size(); ++i) {
+        wspolrzednaKolizji1 = i;
+
+        if (czyKolizja)
+            break;
+
         for (size_t j = i + 1; j < samoloty.size(); ++j) {
+            wspolrzednaKolizji2 = j;
+
             int dx = abs(samoloty[i].x - samoloty[j].x);
             int dy = abs(samoloty[i].y - samoloty[j].y);
 
-            if (samoloty[i].kierunek == samoloty[j].kierunek) {
-                if (dx <= 2 && dy < 3) {
-                    return true;
+            if (samoloty[i].kierunek != samoloty[j].kierunek) {
+                if (dx <= 2 && dy <= 2) {
+                    czyKolizja = true;
+                }
+
+                if (dx == 0 && dy <= 3) {
+                    czyKolizja = true;
                 }
             }
+
             else {
-                if (dx < 3 && dy < 3) {
-                    return true;
+                if (dx <= 2 && dy < 3) {
+                    czyKolizja = true;
                 }
             }
         }
     }
-    return false;
+
+    if (czyKolizja && czyWypisywac) {
+        cout << "Kolizja: Samolot " << samoloty[wspolrzednaKolizji1].oznaczenie << " ("
+             << samoloty[wspolrzednaKolizji1].x << "," << samoloty[wspolrzednaKolizji1].y << ", "
+             << (samoloty[wspolrzednaKolizji1].kierunek ? "kierunek w prawo" : "kierunek w lewo") << ") zderzyl sie z samolotem "
+             << samoloty[wspolrzednaKolizji2].oznaczenie << " ("
+             << samoloty[wspolrzednaKolizji2].x << "," << samoloty[wspolrzednaKolizji2].y << ", "
+             << (samoloty[wspolrzednaKolizji2].kierunek ? "kierunek w prawo" : "kierunek w lewo") << ")" << endl;
+    }
+    return czyKolizja;
+
 }
 
 void monitorujStan(vector<Samolot>* samoloty, atomic<bool>* zatrzymaj, atomic<bool>* kolizja) {
@@ -102,7 +147,7 @@ void monitorujStan(vector<Samolot>* samoloty, atomic<bool>* zatrzymaj, atomic<bo
             throw runtime_error("Wszystkie samoloty zakonczyly lot!");
         }
 
-        if (sprawdzKolizje(*samoloty)) {
+        if (sprawdzKolizje(*samoloty, true)) {
             kolizja->store(true);
             throw runtime_error("Symulacja zakonczona: kolizja w powietrzu!");
         }
@@ -110,6 +155,32 @@ void monitorujStan(vector<Samolot>* samoloty, atomic<bool>* zatrzymaj, atomic<bo
 }
 
 string wydajKomende(vector<Samolot>& samoloty) {
+
+    for (auto& samolot : samoloty) {
+        if (samolot.znakKomendy != '=') {
+            for (const auto& inny : samoloty) {
+                if (samolot.oznaczenie != inny.oznaczenie &&
+                    abs(samolot.x - inny.x) <= 6 &&
+                    abs(samolot.y - inny.y) <= 3) {
+
+                    auto kopia = samoloty;
+                    auto it = find_if(kopia.begin(), kopia.end(),
+                        [&](const Samolot& s) { return s.oznaczenie == samolot.oznaczenie; });
+
+                    for (int t = 0; t < 3; ++t) {
+                        it->przesun();
+                        if (sprawdzKolizje(kopia)) {
+
+                            samolot.znakKomendy = '=';
+                            samolot.liczbaPolKomendy = 0;
+                            return string(1, samolot.oznaczenie) + " c";
+                        }
+                    }
+                    }
+            }
+        }
+    }
+
      for (auto& s1 : samoloty) {
         for (auto& s2 : samoloty) {
             if (s1.kierunek != s2.kierunek &&
@@ -380,6 +451,12 @@ string wydajKomende(vector<Samolot>& samoloty) {
         }
     }
 
+    for (auto& s : samoloty) {
+        if (s.znakKomendy != '=' && (s.znakKomendy == '/' || s.znakKomendy == '\\')) {
+            return string(1, s.oznaczenie) + " c";
+        }
+    }
+
     return "Spacja";
 }
 
@@ -423,18 +500,30 @@ pair<int, int> znajdzNajbezpieczniejszeY(const vector<Samolot>& samoloty, bool k
     return {najlepszeY, maxOdleglosc};
 }
 
-bool generujNowySamolot(vector<Samolot>& samoloty, int& literaIndex) {
+bool generujNowySamolot(vector<Samolot>& samoloty, int& literaIndex, int tura) {
     if (samoloty.size() >= 4) return false;
+    if (tura <= TURA_PIERWSZEGO_SAMOLOTU) return false;
 
-    int prawo = count_if(samoloty.begin(), samoloty.end(), [](const Samolot& p) { return p.kierunek; });
+    int prawo = count_if(samoloty.begin(), samoloty.end(),
+        [](const Samolot& p) { return p.kierunek; });
     int lewo = samoloty.size() - prawo;
-    bool kierunek = (prawo < lewo);
+
+    if (prawo >= 2 && lewo >= 2) return false;
+
+    bool kierunek = (prawo < lewo) ? true : false;
+    if (prawo >= 2) kierunek = false;
+    if (lewo >= 2) kierunek = true;
+
+    int blokadaTur = BLOKADA_STRONY_TURY_POCZATEK;
+    if (tura >= TURA_ZWIEKSZENIA_BLOKADY_2) blokadaTur = 13;
+    else if (tura >= TURA_ZWIEKSZENIA_BLOKADY_1) blokadaTur = 10;
 
     vector<bool> bezpieczneY(RAMKA_Y, true);
-
     for (const auto& s : samoloty) {
-        for (int y = max(0, s.y-2); y <= min(RAMKA_Y-1, s.y+2); ++y) {
-            bezpieczneY[y] = false;
+        if (s.kierunek == kierunek) {
+            for (int y = max(0, s.y-2); y <= min(RAMKA_Y-1, s.y+2); ++y) {
+                bezpieczneY[y] = false;
+            }
         }
     }
 
@@ -446,22 +535,21 @@ bool generujNowySamolot(vector<Samolot>& samoloty, int& literaIndex) {
     if (dostepneY.empty()) return false;
 
     int y = dostepneY[rand() % dostepneY.size()];
-
     char litera = 'A' + literaIndex;
+
     samoloty.emplace_back(y, kierunek, litera);
-    cout << "Pojawil sie samolot " << litera << " na pozycji ("
-         << (kierunek ? 0 : RAMKA_X) << ", " << y+1
-         << ") po stronie " << (kierunek ? "prawej" : "lewej")
-         << " na wysokosci " << y+1 << endl;
+    cout << "Pojawil sie samolot " << litera
+     << " po stronie " << (kierunek ? "lewej" : "prawej")
+     << " na wysokosci " << y+1 << endl;
     literaIndex++;
     return true;
 }
 
-bool dodajSamolotW6Turze(vector<Samolot>& samoloty, int& literaIndex) {
+bool dodajSamolotPodczasWybranejTury(vector<Samolot>& samoloty, int& literaIndex) {
     if (samoloty.size() >= 4) return false;
 
-    int prawo = count_if(samoloty.begin(), samoloty.end(), [](const Samolot& p) { return p.kierunek; });
-    int lewo = samoloty.size() - prawo;
+    int prawo = count_if(samoloty.begin(), samoloty.end(), [](const Samolot& p) { return p.kierunek && !p.czyPoczatkowy; });
+    int lewo = count_if(samoloty.begin(), samoloty.end(), [](const Samolot& p) { return !p.kierunek && !p.czyPoczatkowy; });
     bool kierunek = (prawo < lewo);
 
     auto [y, bezpieczenstwo] = znajdzNajbezpieczniejszeY(samoloty, kierunek);
@@ -474,11 +562,15 @@ bool dodajSamolotW6Turze(vector<Samolot>& samoloty, int& literaIndex) {
         if (s.kierunek == kierunek) {
             if (dx == 0 && dy < 3) {
                 moznaDodac = false;
+                cout << "Nie udalo sie dodac samolotu D w turze " << TURA_PIERWSZEGO_SAMOLOTU
+                << " z powodu zbyt bliskiego samolotu lecacego w te sama strone" << endl;
                 break;
             }
         } else {
             if ((dy == 0 && dx < 8) || (dy <= 2 && dx < 6)) {
                 moznaDodac = false;
+                cout << "Nie udalo sie dodac samolotu D w turze " << TURA_PIERWSZEGO_SAMOLOTU
+               << " z powodu zbyt bliskich samolotow lecacych w przeciwna strone" << endl;
                 break;
             }
         }
@@ -493,7 +585,7 @@ bool dodajSamolotW6Turze(vector<Samolot>& samoloty, int& literaIndex) {
         return true;
     }
 
-    return generujNowySamolot(samoloty, literaIndex);
+    return generujNowySamolot(samoloty, literaIndex, TURA_PIERWSZEGO_SAMOLOTU);
 }
 
 void pauza() {
@@ -512,8 +604,8 @@ void rysujPlansze(const vector<Samolot>& samoloty) {
                 for (const auto& samolot : samoloty) {
                     if (samolot.y == y && x / 5 == samolot.x) {
                         string pokaz = "(" + string(1, samolot.oznaczenie) +
-                                       to_string(samolot.liczbaPolKomendy) + ")" +
-                                       samolot.znakKomendy;
+                           to_string(samolot.liczbaPolKomendy) + ")" +
+                           (samolot.znakKomendy == 'c' ? "=" : string(1, samolot.znakKomendy));
                         cout << pokaz[x % 5];
                         czySamolot = true;
                         break;
@@ -534,10 +626,64 @@ int main() {
     atomic<bool> zatrzymajMonitorowanie(false);
     atomic<bool> wykrytaKolizja(false);
 
-    for (int i = 0; i < 3; ++i) {
-        while (!generujNowySamolot(samoloty, literaIndex)) {
+    vector<char> dostepneLitery = {'A', 'B', 'C'};
+    random_shuffle(dostepneLitery.begin(), dostepneLitery.end());
+
+    bool stronaA = rand() % 2 == 0;
+    int yA = rand() % RAMKA_Y;
+    samoloty.emplace_back(yA, stronaA, 'A');
+    samoloty.back().czyPoczatkowy = true;
+    cout << "Pojawil sie samolot " << 'A'
+     << " po stronie " << (stronaA ? "lewej" : "prawej")
+     << " na wysokosci " << yA+1 << endl;
+
+    bool stronaB = rand() % 2 == 0;
+    int yB;
+    do {
+        yB = rand() % RAMKA_Y;
+
+        if (stronaA == stronaB) {
+            for (const auto& s : samoloty) {
+                if (s.kierunek == stronaB && abs(s.y - yB) <= 2) {
+                    yB = -1;
+                    break;
+                }
+            }
         }
+    } while (yB == -1);
+
+    samoloty.emplace_back(yB, stronaB, 'B');
+    samoloty.back().czyPoczatkowy = true;
+    cout << "Pojawil sie samolot " << 'B'
+      << " po stronie " << (stronaB ? "lewej" : "prawej")
+      << " na wysokosci " << yB+1 << endl;
+
+    bool stronaC;
+    if (stronaA == stronaB) {
+        stronaC = !stronaA;
+    } else {
+        stronaC = rand() % 2 == 0;
     }
+
+    int yC;
+    do {
+        yC = rand() % RAMKA_Y;
+
+        for (const auto& s : samoloty) {
+            if (s.kierunek == stronaC && abs(s.y - yC) <= 2) {
+                yC = -1;
+                break;
+            }
+        }
+    } while (yC == -1);
+
+    samoloty.emplace_back(yC, stronaC, 'C');
+    samoloty.back().czyPoczatkowy = true;
+    cout << "Pojawil sie samolot " << 'C'
+     << " po stronie " << (stronaC ? "lewej" : "prawej")
+     << " na wysokosci " << yC+1 << endl;
+
+    literaIndex = 3;
 
     thread watekMonitorujacy([&]() {
         monitorujStan(&samoloty, &zatrzymajMonitorowanie, &wykrytaKolizja);
@@ -564,19 +710,54 @@ int main() {
             }
 
             string komenda;
+            string poprzedniaKomenda = "Brak";
+
             {
                 lock_guard<mutex> lock(mutexSamolotow);
-                komenda = wydajKomende(samoloty);
-            }
-            cout << "Tura " << tura << ": " << komenda << endl;
 
-            if (tura == 6) {
-                lock_guard<mutex> lock(mutexSamolotow);
-                dodajSamolotW6Turze(samoloty, literaIndex);
+                vector<Samolot> kopia = samoloty;
+                komenda = wydajKomende(samoloty);
+
+                if (komenda != "Spacja") {
+                    char litera = komenda[0];
+                    auto it = find_if(kopia.begin(), kopia.end(), [litera](const Samolot& s) {
+                        return s.oznaczenie == litera;
+                    });
+
+                    if (it != kopia.end()) {
+                        if (it->znakKomendy == '=')
+                            poprzedniaKomenda = string(1, it->oznaczenie) + " =";
+                        else if (it->znakKomendy == 'c')
+                            poprzedniaKomenda = string(1, it->oznaczenie) + " c";
+                        else
+                            poprzedniaKomenda = string(1, it->oznaczenie) + " " + it->znakKomendy + " " + to_string(it->liczbaPolKomendy);
+                    }
+                }
             }
-            else if (rand() % 10 == 0) {
+
+
+            string opis;
+            if (komenda == "Spacja") opis = "(utrzymanie kursu)";
+            else if (komenda.find("/") != string::npos) opis = "(wznoszenie)";
+            else if (komenda.find("\\") != string::npos) opis = "(obnizanie)";
+            else if (komenda.find("c") != string::npos) opis = "(anulowanie manewru)";
+
+            cout << "Tura " << tura << ": " << komenda << " " << opis;
+            if (poprzedniaKomenda != "Brak") {
+                cout << " | Bez komendy wykonwalby: " << poprzedniaKomenda;
+            }
+            cout << endl;
+
+
+
+
+            if (tura == TURA_PIERWSZEGO_SAMOLOTU) {
                 lock_guard<mutex> lock(mutexSamolotow);
-                generujNowySamolot(samoloty, literaIndex);
+                dodajSamolotPodczasWybranejTury(samoloty, literaIndex);
+            }
+            else if (tura > TURA_PIERWSZEGO_SAMOLOTU && rand() % 10 == 0 && samoloty.size() < 4) {
+                lock_guard<mutex> lock(mutexSamolotow);
+                generujNowySamolot(samoloty, literaIndex, tura);
             }
 
             {

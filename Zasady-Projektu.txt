@@ -1,131 +1,121 @@
 Projekt: Symulator Wieży Kontroli Lotów
-1. Ogólne zasady
-Gra to symulacja kontroli ruchu lotniczego na planszy 12×10 pól (X = 0..11, Y = 0..9).
+- Projekt nr. 2 - Zadanie 7 dla ACiR
+- Wykonali Adrian Protasiuk s203374 oraz Kajetan Rajczyk s203627, acir 3B
 
-Wyświetlana plansza ma rozmiar 60×10 znaków (każde X zajmuje 5 znaków szerokości).
+Opis ogólny:
+Projekt stanowi symulację działania wieży kontroli ruchu lotniczego na dwuwymiarowej planszy, w której samoloty poruszają się poziomo z możliwością ograniczonego manewrowania w pionie. Celem systemu jest zapewnienie bezpieczeństwa przelotów poprzez inteligentne wydawanie komend na podstawie analizy przewidywanej trajektorii lotów oraz unikanie kolizji. Graficzna reprezentacja odbywa się w konsoli tekstowej, a całość procesu sterowana jest w pełni automatycznie.
 
-Samoloty poruszają się poziomo (→ lub ←) oraz opcjonalnie pionowo (↑ lub ↓) według wydanych komend.
+- Warto dodać iż w projekcie chodzi o maksymalizację szans uniknięcia kolizji, chociaż czasem program nie jest w stanie jej uniknąć
 
-Samolot na ekranie zajmuje 5 znaków, np. (A3)/.
+====================================================================
+1. Struktura planszy i reprezentacja wizualna:
+====================================================================
 
-2. Początek symulacji
-Na starcie generowane są 3 samoloty:
+- Plansza logiczna: siatka o wymiarach 12 kolumn (X: 0–11) i 10 rzędów (Y: 0–9).
+- Plansza wyświetlana: 60 znaków szerokości i 10 znaków wysokości (każda kolumna X reprezentowana przez 5 znaków).
+- Ramka: znak '=' dla góry/dolnego obramowania, '|' dla boków.
+- Samolot wyświetlany jako pięcioznakowy ciąg w formacie (Lx)Z, gdzie:
+  - L: litera identyfikująca samolot,
+  - x: liczba tur do zakończenia manewru,
+  - Z: znak aktualnej komendy ('/', '\', '=', 'c').
 
-2 po jednej stronie (prawej lub lewej), 1 po przeciwnej.
+====================================================================
+2. Parametry i atrybuty samolotu:
+====================================================================
 
-Każdy samolot startuje z X = -1 (lecąc w prawo) lub X = 12 (lecąc w lewo).
+Każdy obiekt klasy `Samolot` posiada następujące właściwości:
 
-Każdy samolot:
+- `int x, y` — pozycja samolotu na planszy (kolumna, rząd),
+- `char oznaczenie` — unikalna litera identyfikacyjna (A, B, C, ...),
+- `bool kierunek` — true (→), false (←),
+- `bool czyLeci` — true oznacza, że samolot aktywnie uczestniczy w grze,
+- `char znakKomendy` — '=' (lot prosty), '/', '\' (zmiana wysokości), 'c' (anulowanie),
+- `int liczbaPolKomendy` — liczba pozostałych tur wykonywania manewru,
+- `bool aktywowanaKomenda` — czy komenda jest aktywna (zazwyczaj true po jednej turze od ustawienia),
+- `bool czyPoczatkowy` — czy samolot został utworzony przy starcie symulacji.
 
-Ma unikalne oznaczenie literowe (A, B, C, ...).
+====================================================================
+3. Inicjalizacja symulacji:
+====================================================================
 
-Posiada status czyLeci = true.
+- Na początku generowane są 3 samoloty (A, B, C).
+  - Dwa po jednej stronie, jeden po przeciwnej (lewo/prawo — losowo).
+  - Samoloty startują z x = -1 (dla prawej strony, czyli lecąc w prawo) lub x = 12 (dla lewej, lecąc w lewo).
+  - Pozycja Y dobierana jest losowo z zachowaniem minimalnego odstępu 3 jednostek w pionie.
+  - Komenda początkowa to '='.
 
-Losowo wybieraną wysokość Y przy zachowaniu minimalnego odstępu 3 jednostek od innych.
+====================================================================
+4. Przebieg tury gry:
+====================================================================
 
-Domyślną komendę stabilnego lotu =.
+Każda tura składa się z następujących kroków:
 
-3. Przebieg każdej tury
-W każdej turze wykonywane są kolejno:
+1. Ruch samolotów:
+   - Każdy samolot przesuwa się o jedno pole w poziomie (w kierunku zgodnym z `kierunek`).
+   - Jeśli komenda '/' lub '\' jest aktywna i `liczbaPolKomendy > 0`, samolot zmienia wysokość o 1 jednostkę.
+   - Po wykonaniu manewru powraca do komendy '='.
 
-1. Ruch samolotów
-Każdy samolot:
+2. Wydanie jednej komendy:
+   - Program analizuje aktualną sytuację i przewiduje rozwój przez 12 tur (`PRZEWIDYWANIE_TUR = 12`).
+   - Dobierana jest optymalna komenda: 
+     - `<litera> / <n>` — polecenie wznoszenia,
+     - `<litera> \ <n>` — polecenie obniżenia,
+     - `<litera> c` — anulowanie aktywnego manewru,
+     - `Spacja` — brak komendy (utrzymanie kursu).
 
-Przesuwa się poziomo o 1 pole zgodnie z kierunkiem (→ lub ←).
+3. Dodanie nowego samolotu:
+   - Z prawdopodobieństwem 10% oraz gwarantowanie w turze 6, jeśli aktywnych samolotów jest mniej niż 4.
+   - Nowy samolot:
+     - Ma unikalną literę (D, E, ...),
+     - Pojawia się po bezpiecznej stronie (z mniejszą liczbą samolotów),
+     - Dobiera bezpieczną wysokość z zachowaniem odstępu od innych samolotów.
 
-Jeśli aktywna jest komenda (/ lub \), zmienia także wysokość Y (o 1 pole na turę).
+4. Wizualizacja:
+   - Plansza rysowana jest po każdej turze w konsoli.
+   - Samoloty przedstawione są w zredukowanej skali (1 kolumna = 5 znaków).
 
-Po zakończeniu manewru wraca do stabilnego lotu (=).
+5. Pauza:
+   - Po każdej turze program zatrzymuje się na 1,5 sekundy (dla efektu animacji).
 
-2. Wydanie jednej komendy
-Program automatycznie wybiera optymalną komendę:
+====================================================================
+5. Zasady kolizji i zakończenia gry:
+====================================================================
 
-"Spacja" – brak zmiany.
+- Kolizja występuje, gdy dwa samoloty:
+  - Znajdują się w tej samej lub sąsiedniej kolumnie (|X1 - X2| ≤ 2),
+  - Oraz różnica wysokości |Y1 - Y2| ≤ 2.
+- Dla samolotów lecących w przeciwnych kierunkach: kolizja przy |X1 - X2| < 3 i |Y1 - Y2| < 3.
 
-<litera> / <1-9> – nakaz wzniesienia się.
+Symulacja kończy się, jeśli:
+- Wszystkie samoloty opuszczą planszę (x < -1 lub x > 12),
+- Zostanie wykryta kolizja.
 
-<litera> \ <1-9> – nakaz obniżenia lotu.
+====================================================================
+6. Mechanizm monitorujący (wątek równoległy): - wymaganie dodatkowe Projektu
+====================================================================
 
-3. Dodawanie nowego samolotu
+- Wątek `monitorujStan()` działa równolegle do głównego obiegu symulacji.
+- Co 100 ms sprawdza, czy:
+  - Wszystkie samoloty opuściły planszę — wtedy zgłaszany jest wyjątek zakończenia,
+  - Wystąpiła kolizja — program kończy działanie z komunikatem.
 
-W każdej turze jest 10% szans na pojawienie się nowego samolotu (generujNowySamolot).
+====================================================================
+7. Logika inteligentnych komend:
+====================================================================
 
-Dodatkowo w 6. turze nowy samolot dodawany jest gwarantowanie, jeśli są mniej niż 4 samoloty.
+- System przewiduje trajektorie do 12 tur wprzód.
+- Przy wydawaniu komendy uwzględnia:
+  - Krytyczne kolumny,
+  - Ryzyko bezpośredniego przecięcia tras,
+  - Wysokości sąsiadujących samolotów,
+  - Maksymalną minimalną odległość między dowolnymi dwoma samolotami w trakcie symulacji.
+- Najlepszy scenariusz (bezpieczny, efektywny) wybierany jest według złożonej heurystyki (priorytet, zmiana wysokości, przewidywana kolizja).
 
-Nowy samolot:
+====================================================================
+8. Ograniczenia i parametry gry:
+====================================================================
 
-Losowo wybiera stronę.
-
-Wybiera bezpieczną wysokość (odstęp min. 3 jednostki od innych).
-
-Otrzymuje kolejną literę (D, E, itd.).
-
-Maksymalna liczba samolotów na planszy: 4.
-
-4. Wyświetlenie planszy
-
-Po wykonaniu ruchów i wydaniu komendy wyświetlana jest cała aktualna plansza.
-
-5. Pauza
-
-Po każdej turze następuje pauza 1,5 sekundy.
-
-4. Inteligentne wydawanie komend
-Program przewiduje ruchy na 12 tur do przodu (PRZEWIDYWANIE_TUR = 12).
-
-Komendy dobierane są na podstawie analizy przyszłych trajektorii.
-
-Preferowane są:
-
-Bezpieczne manewry (zapobiegające kolizjom).
-
-Minimalne zmiany wysokości.
-
-Uniki, jeśli samoloty zbliżają się czołowo.
-
-5. Zasady kolizji i zakończenia gry
-Kolizja występuje, jeśli dwa samoloty:
-
-Są w tej samej lub sąsiedniej kolumnie (|X1 - X2| <= 2 dla tego samego kierunku lub <3 dla przeciwnego kierunku).
-
-Mają wysokości różniące się maksymalnie o 2 jednostki (|Y1 - Y2| <= 2).
-
-Zakończenie symulacji:
-
-Jeśli wszystkie samoloty wylecą poza planszę (X < -1 lub X > 12).
-
-Jeśli wykryta zostanie kolizja.
-
-W obu przypadkach wyświetlany jest odpowiedni komunikat i program kończy działanie.
-
-6. Mechanizm monitorowania (w osobnym wątku)
-W tle działa oddzielny wątek (monitorujStan) sprawdzający w czasie rzeczywistym:
-
-Czy wszystkie samoloty zakończyły lot.
-
-Czy wystąpiła kolizja.
-
-Wątek zakończy program automatycznie w przypadku wykrycia kolizji lub końca lotów.
-
-7. Własności techniczne samolotu (Plane)
-Każdy samolot (Plane) zawiera:
-
-int x, y – współrzędne na planszy.
-
-char oznaczenie – unikalna litera (A, B, C, ...).
-
-bool czyLeci – czy samolot aktywnie uczestniczy w symulacji.
-
-bool kierunek – true (prawo), false (lewo).
-
-int liczbaPolKomendy – liczba pozostałych tur wykonania komendy.
-
-char znakKomendy – '=', '/', '\'.
-
-bool aktywowanaKomenda – czy komenda już działa.
-
-
-
-
-
-
+- Maksymalna liczba samolotów na planszy jednocześnie: 4 (gdzie 2 lecące w prawą stronę oraz 2 lecące w lewą stonę)
+- Minimalny odstęp pionowy przy starcie: 3 jednostki.
+- Komendy manewrów mogą trwać maksymalnie 4 tury (zależnie od potrzeby uniku).
+- Symulacja zawsze kończy się automatycznie — nie ma ręcznego wyłączania.
